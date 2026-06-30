@@ -37,7 +37,16 @@ class Settings(BaseSettings):
     INDIANRAIL_API_KEY: str = Field(default="", repr=False)
 
     # Database
-    NEON_DSN: str = Field(default="", repr=False)
+    DATABASE_URL: str = Field(default="", repr=False)
+
+    DB_POOL_MIN_SIZE: int = 1
+    DB_POOL_MAX_SIZE: int = 10
+
+    DB_CONNECT_TIMEOUT: int = 180
+    DB_COMMAND_TIMEOUT: int = 60
+
+    DB_CONNECT_RETRIES: int = 3
+    DB_RETRY_DELAY: int = 2
 
     # Cache
     CACHE_ENABLED: bool = True

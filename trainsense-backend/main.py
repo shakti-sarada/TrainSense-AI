@@ -12,6 +12,12 @@ from core.config import settings
 from core.logger import configure_logging
 from db.connection import database
 
+from api.chat import router as chat_router
+from api.clear import router as clear_router
+from api.preferences import router as preferences_router
+from api.subscribe import router as subscribe_router
+from api.metrics import router as metrics_router
+
 # Configure application logging
 configure_logging()
 
@@ -44,6 +50,11 @@ app = FastAPI(
 
 # Register API routers
 app.include_router(health_router)
+app.include_router(chat_router)
+app.include_router(clear_router)
+app.include_router(preferences_router)
+app.include_router(subscribe_router)
+app.include_router(metrics_router)
 
 
 @app.get("/", tags=["Root"])

@@ -2,6 +2,7 @@
 Async PostgreSQL connection manager.
 """
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -22,42 +23,75 @@ class Database:
 
     @property
     def pool(self) -> Pool:
-        """Return the active database pool."""
+        """Return the active database connection pool."""
 
         if self._pool is None:
-            raise RuntimeError("Database connection has not been initialized.")
+            raise RuntimeError("Database connection pool has not been initialized.")
 
         return self._pool
 
     async def connect(self) -> None:
-        """Create and verify the connection pool."""
+        """Create and verify the database connection pool."""
 
         if self._pool is not None:
             logger.info("Database pool already initialized.")
             return
 
-        try:
-            self._pool = await asyncpg.create_pool(
-                dsn=settings.NEON_DSN,
-                min_size=1,
-                max_size=10,
-                command_timeout=30,
-            )
+        for attempt in range(1, settings.DB_CONNECT_RETRIES + 1):
+            try:
+                logger.info(
+                    "Connecting to database (Attempt %d/%d)...",
+                    attempt,
+                    settings.DB_CONNECT_RETRIES,
+                )
 
-            async with self._pool.acquire() as connection:
-                version = await connection.fetchval("SELECT version();")
+                self._pool = await asyncpg.create_pool(
+                    dsn=settings.DATABASE_URL,
+                    min_size=settings.DB_POOL_MIN_SIZE,
+                    max_size=settings.DB_POOL_MAX_SIZE,
+                    timeout=settings.DB_CONNECT_TIMEOUT,
+                    command_timeout=settings.DB_COMMAND_TIMEOUT,
+                )
 
-            logger.info("Database connected successfully.")
-            logger.debug("PostgreSQL Version: %s", version)
+                async with self._pool.acquire() as connection:
+                    if settings.DEBUG:
+                        version = await connection.fetchval("SELECT version();")
+                        logger.debug("PostgreSQL Version: %s", version)
+                    else:
+                        await connection.execute("SELECT 1")
 
-        except Exception:
-            logger.exception("Failed to connect to the database.")
-            raise
+                logger.info("Database connected successfully.")
+
+                return
+
+            except Exception:
+                logger.exception(
+                    "Database connection attempt %d failed.",
+                    attempt,
+                )
+
+                if self._pool is not None:
+                    await self._pool.close()
+                    self._pool = None
+
+                if attempt == settings.DB_CONNECT_RETRIES:
+                    logger.error("All database connection attempts failed.")
+                    raise
+
+                delay = settings.DB_RETRY_DELAY * (2 ** (attempt - 1))
+
+                logger.warning(
+                    "Retrying database connection in %d second(s)...",
+                    delay,
+                )
+
+                await asyncio.sleep(delay)
 
     async def disconnect(self) -> None:
-        """Close the connection pool."""
+        """Close the database connection pool."""
 
         if self._pool is None:
+            logger.info("Database pool already closed.")
             return
 
         await self._pool.close()
