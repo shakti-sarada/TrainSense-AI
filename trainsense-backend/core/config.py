@@ -4,6 +4,8 @@ Application configuration loaded from environment variables.
 
 from functools import lru_cache
 
+import logging
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -55,3 +57,13 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+def configure_logging() -> None:
+    """Configure application logging."""
+
+    logging.basicConfig(
+        level=settings.LOG_LEVEL,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
